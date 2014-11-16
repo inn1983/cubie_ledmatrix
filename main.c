@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sched.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "gpio_lib.h"
 #define PD0    SUNXI_GPD(0)
@@ -47,8 +48,10 @@
 #define A_port SUNXI_GPD(21)
 #define G_port SUNXI_GPD(19)
 #define DI_port SUNXI_GPD(17)
-#define CLK_port SUNXI_GPB(2)
-#define Latch_port SUNXI_GPD(24)
+#define CLK_port SUNXI_GPD(2)
+#define Latch_port SUNXI_GPD(0)
+
+#define MILLION 1000000L
 
 unsigned char table2[] = {
   0x00,0x02,0x00,0x02,0xf8,0x3f,0x00,0x04,0x40,0x04,0xf0,0x07,0x5c,0x1c,0x44,0x34,
@@ -71,23 +74,56 @@ int HC595_Data_Send(unsigned char daH, unsigned char daL, int han)
 	int i;
 	sunxi_gpio_output(Latch_port, LOW);
 	sunxi_gpio_output(CLK_port, LOW);
-
+	
+	
+	unsigned char dummyL1 = 0xA0;
+	unsigned char dummyH1 = 0xA0;
+	
+	unsigned char dummyL2 = 0xA0;
+	unsigned char dummyH2 = 0xA0;
+	unsigned int delay = 0;
+	
+	//usleep(delay);
 	for(i=0;i<8;i++){
-		if(((daL)&0x01)!=0) sunxi_gpio_output(DI_port,HIGH);
+		if(((dummyL1)&0x01)!=0) sunxi_gpio_output(DI_port,HIGH);
 		else sunxi_gpio_output(DI_port,LOW);
 		sunxi_gpio_output(CLK_port,HIGH);
+		//usleep(delay);
 		sunxi_gpio_output(CLK_port,LOW);
-		daL >>= 1;
+		dummyL1 >>= 1;
 	}
 
+	//usleep(delay);
 	for(i=0;i<8;i++){
-        	if(((daH)&0x01)!=0) sunxi_gpio_output(DI_port,HIGH);
-        	else sunxi_gpio_output(DI_port,LOW);
+        if(((dummyH1)&0x01)!=0) sunxi_gpio_output(DI_port,HIGH);
+        else sunxi_gpio_output(DI_port,LOW);
 		sunxi_gpio_output(CLK_port,HIGH);
+		//usleep(delay);
 		sunxi_gpio_output(CLK_port,LOW);
-		daH >>= 1;
+		dummyH1 >>= 1;
     }
 	
+	//usleep(delay);
+	for(i=0;i<8;i++){
+		if(((dummyL2)&0x01)!=0) sunxi_gpio_output(DI_port,HIGH);
+		else sunxi_gpio_output(DI_port,LOW);
+		sunxi_gpio_output(CLK_port,HIGH);
+		//usleep(delay);
+		sunxi_gpio_output(CLK_port,LOW);
+		dummyL2 >>= 1;
+	}
+	
+	//usleep(delay);
+	for(i=0;i<8;i++){
+		if(((dummyH2)&0x01)!=0) sunxi_gpio_output(DI_port,HIGH);
+		else sunxi_gpio_output(DI_port,LOW);
+		sunxi_gpio_output(CLK_port,HIGH);
+		//usleep(delay);
+		sunxi_gpio_output(CLK_port,LOW);
+		dummyH2 >>= 1;
+	}
+	
+
 	
 	sunxi_gpio_output(G_port,HIGH);
 	
@@ -199,7 +235,21 @@ int main()
 {
 	struct timespec slptm;
 	slptm.tv_sec = 0;
-    slptm.tv_nsec = 1000*1;      //1000 ns = 1 us
+	int cont = 1000;
+    slptm.tv_nsec = 1000*cont;      //1000 ns = 1 us
+	struct sched_param param;
+	long interval;
+	struct timeval tend,tstart;
+	int maxpri; 
+    int sched = SCHED_RR;
+	
+	maxpri = sched_get_priority_max(SCHED_RR);
+	
+    param.sched_priority = maxpri;
+    sched_setscheduler(getpid(),sched,&param);
+	fprintf(stderr,"priority is %d\n",param.sched_priority);
+	int scheduler = sched_getscheduler(getpid());
+	fprintf(stderr,"scheduler is %d\n",scheduler);
 	
     if(SETUP_OK!=sunxi_gpio_init()){
         printf("Failed to initialize GPIO\n");
@@ -220,11 +270,21 @@ int main()
 	int k=0;
 	while(1){
 		for(i=0; i<40000; i++){
+			gettimeofday(&tstart,NULL);
+		
 			HC595_Data_Send(~table2[(k*16+j)*2+1],~table2[(k*16+j)*2],j);
 			j++;
 			if(j==16) j=0;
 			//usleep(1000);
-			nanosleep(&slptm, NULL);
+			//nanosleep(&slptm, NULL);
+			clock_nanosleep(CLOCK_REALTIME , 0, &slptm, NULL);
+			gettimeofday(&tend,NULL);
+			
+			interval = MILLION*(tend.tv_sec - tstart.tv_sec)
+                   +(tend.tv_usec-tstart.tv_usec);
+			
+			if (interval>=2000)
+				fprintf(stderr,"the expected time is %d us,but real time cost is %lu us\n",cont,interval);
 		}
 		k++;
 		if(k==1) k=0;

@@ -16,7 +16,7 @@ TARGET := cubie_ledmatrix
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) -lrt
 #	$(STRIP) $@
 
 clean:
