@@ -53,6 +53,18 @@
 
 #define MILLION 1000000L
 
+int mySleep(int sec, int usec)
+{
+	struct timeval tv;
+	tv.tv_sec = sec;
+	tv.tv_usec = usec;
+
+	select(0, NULL, NULL, NULL, &tv);
+
+	return 0;
+}
+
+
 unsigned char table2[] = {
   0x00,0x02,0x00,0x02,0xf8,0x3f,0x00,0x04,0x40,0x04,0xf0,0x07,0x5c,0x1c,0x44,0x34,
   0x46,0x24,0x82,0x64,0x82,0x44,0x06,0x45,0x04,0x46,0x1c,0x38,0x70,0x00,0x00,0x00,
@@ -272,12 +284,13 @@ int main()
 		for(i=0; i<40000; i++){
 			gettimeofday(&tstart,NULL);
 		
-			HC595_Data_Send(~table2[(k*16+j)*2+1],~table2[(k*16+j)*2],j);
+			//HC595_Data_Send(~table2[(k*16+j)*2+1],~table2[(k*16+j)*2],j);
 			j++;
 			if(j==16) j=0;
-			//usleep(1000);
+			usleep(1000);
 			//nanosleep(&slptm, NULL);
-			clock_nanosleep(CLOCK_REALTIME , 0, &slptm, NULL);
+			//clock_nanosleep(CLOCK_REALTIME , 0, &slptm, NULL);
+			//mySleep(0, 1000);
 			gettimeofday(&tend,NULL);
 			
 			interval = MILLION*(tend.tv_sec - tstart.tv_sec)
